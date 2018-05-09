@@ -1,0 +1,69 @@
+#!/bin/sh
+# 
+# Cihan Alkan Tarafından Kodlanmıştır
+
+Gerekler() {
+    sudo rm -r /tmp/aydeb
+
+	list="$(zenity --file-selection --title="Kurmak istediğiniz DEB dosyasını seçiniz" ---file-filter=*.deb)"
+
+	zenity --info --title="Ay-DEB DEB Kurucu" --text "Aşağıda belirtilen paket sisteminize kurulacaktır:\n\n$list" --height=30 --width=350
+    mkdir /tmp/aydeb
+    cd /tmp/aydeb
+	ar x $list
+    tar xf ./control.tar.gz
+    gerekli="$(grep ^Depends: control)"
+    zenity --info --title="Ay-DEB DEB Kurucu" --text "Programın çalışması için aşağıdaki bağımlılıkların kurulu olması gerekmektedir:\n\n$gerekli" --height=30 --width=350
+    mkdir paket
+    cd paket
+	tar xf ../data.tar.gz
+
+}
+Pkgbuild() { 
+cd /tmp/aydeb
+isim="$(grep ^Package: control)"
+versiyon="$(grep ^Version: control)"
+tanim="$(grep ^Description: control)"
+site="$(grep ^Homepage: control)"
+kaynak="$(grep ^Description: control)"
+
+echo pkgname=$isim > PKGBUILD
+echo pkgver=$versiyon >> PKGBUILD
+echo pkgrel=1  >> PKGBUILD
+echo pkgdesc='$tanim' >> PKGBUILD
+echo url="$site" >> PKGBUILD
+sed -i s/'=Package: '/=/g PKGBUILD
+sed -i s/'=Version: '/=/g PKGBUILD
+grep ^pkgver: PKGBUILD | sed -i s/-//g PKGBUILD
+sed -i s/'=Homepage: '/=/g PKGBUILD
+sed -i s/'Description: '//g PKGBUILD
+cat > /tmp/aydeb/talimat << "EOF" &&
+
+arch=(x86_64)
+depends=()
+makedepends=()
+source=()
+
+package() {
+    mkdir -p $pkgdir/usr
+    mkdir -p $pkgdir/etc
+    cp -r /tmp/aydeb/paket/usr/* $pkgdir/usr/
+#    cp -r /tmp/aydeb/paket/etc/* $pkgdir/etc/
+
+}
+EOF
+
+cat talimat >> PKGBUILD
+makepkg -f skipinteg
+sudo pacman -U --noconfirm *pkg.tar.xz
+}
+
+# Kullanıcı selamlama
+zenity --question --title="Ay-DEB DEB Kurucu" --text "Ay-DEB DEB Kurucuya Hoş Geldiniz.\n\nBu betik Arch Linux üzerinde DEB uzantılı paketleri kolayca kurmak için hazırlandı.\nYapmanız gereken kurmak istediğiniz DEB paketini seçip kurulumu onaylamanız.\nBu betik ile kurulum yapmanız durumunda Arch dizin yapısıyla uyumsuz olan paketler ve eksik bağımlılığı olan paketler çalışmayacaktır.\n\nOnaylamak için 'Evet' veya çıkmak için 'Hayır'ı tıklayın." --width=500
+
+if [ "$?" = "1" ]
+	then exit
+fi
+
+Gerekler
+Pkgbuild
